@@ -276,6 +276,7 @@ tbody tr.pago:hover{background:var(--pago-hover)}
     <button class="hbtn add" onclick="openModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Novo</button>
     <button class="hbtn themebtn" id="themeBtn" onclick="toggleTheme()" title="Alternar modo claro/escuro"></button>
     <button class="hbtn" onclick="openLog()" title="Histórico de alterações"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Histórico</button>
+    <button class="hbtn" id="btnSenhas" onclick="openSenhas()" title="Alterar senhas dos usuarios (somente gestao)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="m16 5 3 3"/><path d="m19 2 3 3"/></svg>Senhas</button>
     <button class="hbtn" onclick="doLogout()" title="Sair"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sair</button>
   </div>
 </header>
@@ -334,6 +335,19 @@ tbody tr.pago:hover{background:var(--pago-hover)}
   <div class="modal-h"><h3 id="recTitle">Recibo de quitação</h3><button class="xbtn" onclick="closeRec()">&times;</button></div>
   <div class="modal-b" style="display:block" id="recBody"></div>
   <div class="modal-f"><button class="btn" onclick="closeRec()">Cancelar</button><button class="btn primary" onclick="gerarRecibo()">Gerar recibo de quitação</button></div>
+</div></div>
+
+<div class="ov" id="ovSenhas"><div class="modal">
+  <div class="modal-h"><h3>Alterar senha de usuario</h3><button class="xbtn" onclick="closeSenhas()">&times;</button></div>
+  <div class="modal-b" style="display:block" id="senhasBody">
+    <div class="fld full"><label>E-mail do usuario</label><input id="senhaEmail" type="email" list="listaUsuarios" placeholder="usuario@exemplo.com" autocomplete="off"><datalist id="listaUsuarios"></datalist></div>
+    <div class="fld"><label>Nova senha</label><input id="senhaNova" type="password" placeholder="minimo 6 caracteres" autocomplete="new-password"></div>
+    <div class="fld"><label>Repita a nova senha</label><input id="senhaConf" type="password" placeholder="digite de novo" autocomplete="new-password"></div>
+    <div class="fld full" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="senhaShow" onchange="var t=this.checked?'text':'password';document.getElementById('senhaNova').type=t;document.getElementById('senhaConf').type=t;"><label style="text-transform:none;font-size:13px;color:#444">Mostrar as senhas digitadas</label></div>
+    <div id="senhaMsg" style="margin-top:6px;font-size:13px;font-weight:600"></div>
+    <div class="hint" style="font-size:11px;color:#889;margin-top:6px">A pessoa passa a entrar com a nova senha imediatamente. Somente o perfil gestao consegue fazer esta alteracao.</div>
+  </div>
+  <div class="modal-f"><button class="btn" onclick="closeSenhas()">Cancelar</button><button class="btn primary" onclick="salvarSenha()">Alterar senha</button></div>
 </div></div>
 
 <div class="toast" id="toast"></div>
@@ -502,7 +516,7 @@ function rowHTML(r){
   const m=mesesPend(r.competencia);
   const proc='<span class="proc mono">'+esc(r.processo)+'</span> <button class="copy" onclick="copyTxt(\''+r.processo+'\')" title="Copiar processo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
   const cli='<span class="cli">'+esc(r.nome)+(r.obs?'<span class="obsdot" title="'+esc(r.obs)+'"></span>':'')+'</span>';
-  const stt='<button class="stbtn '+(r.pago?'pago':'pend')+'" onclick="togglePago('+jid(r)+')">'+(r.pago?'PAGO':'PENDENTE')+'</button>';
+  const stt=isGestao?'<button class="stbtn '+(r.pago?'pago':'pend')+'" onclick="togglePago('+jid(r)+')">'+(r.pago?'PAGO':'PENDENTE')+'</button>':'<span class="stbtn '+(r.pago?'pago':'pend')+'" style="cursor:default" title="Somente a gestao pode alterar o pagamento">'+(r.pago?'PAGO':'PENDENTE')+'</span>';
   const cp='<input type="checkbox" class="cpbox" '+(r.cp?'checked':'')+' onchange="toggleCp('+jid(r)+')" title="Cliente Problema">';
   let cells='<td data-l="C.P.">'+cp+'</td>'
     +'<td data-l="Cliente">'+cli+'</td>'
@@ -591,7 +605,7 @@ function clRow(r){
   let meta='<span class="gtag g-'+gcls(r.grupo)+'">'+esc(r.grupo)+'</span>'
     +'<span>'+esc(r.competencia)+'</span>'
     +(isGestao?'<span class="ag '+tempoCls(m)+'">'+tempoLabel(m)+'</span>':'')
-    +'<button class="stbtn '+(r.pago?'pago':'pend')+'" onclick="togglePago('+jid(r)+')">'+(r.pago?'PAGO':'PENDENTE')+'</button>'
+    +(isGestao?'<button class="stbtn '+(r.pago?'pago':'pend')+'" onclick="togglePago('+jid(r)+')">'+(r.pago?'PAGO':'PENDENTE')+'</button>':'<span class="stbtn '+(r.pago?'pago':'pend')+'" style="cursor:default" title="Somente a gestao pode alterar o pagamento">'+(r.pago?'PAGO':'PENDENTE')+'</span>')
     +(r.cp?'<span class="bdg cp">C.P.</span>':'');
   return '<div class="cl-row">'
     +'<div class="cl-top"><span class="proc mono">'+esc(r.processo)+' <button class="copy" onclick="copyTxt(\''+r.processo+'\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></span>'+right+'</div>'
@@ -611,7 +625,7 @@ async function persist(id,patch){
   return true;
 }
 async function toggleCp(id){const r=findRec(id);if(!r)return;r.cp=!r.cp;render();await persist(id,{cp:r.cp});}
-async function togglePago(id){const r=findRec(id);if(!r)return;r.pago=!r.pago;render();
+async function togglePago(id){if(!isGestao){toast('Somente a gestao pode alterar o pagamento','err');return;}const r=findRec(id);if(!r)return;r.pago=!r.pago;render();
   if(await persist(id,{pago:r.pago}))toast(r.pago?'Marcado como PAGO':'Reaberto como pendente','ok');}
 function toggleExp(id){const el=document.getElementById('exp_'+cssid(id));if(el)el.style.display=el.style.display==='none'?'table-row':'none';}
 async function savePag(id){
@@ -733,6 +747,39 @@ function buildFilterOptions(){
   document.getElementById('ano').value=selA; document.getElementById('mes').value=selM;
 }
 /* ---------- login / init ---------- */
+async function openSenhas(){
+  if(!isGestao){toast('Apenas a gestao pode alterar senhas','err');return;}
+  if(!sb){toast('Sistema nao configurado','err');return;}
+  var m=document.getElementById('senhaMsg');m.textContent='';m.style.color='';
+  document.getElementById('senhaEmail').value='';
+  document.getElementById('senhaNova').value='';
+  document.getElementById('senhaConf').value='';
+  document.getElementById('senhaShow').checked=false;
+  document.getElementById('senhaNova').type='password';
+  document.getElementById('senhaConf').type='password';
+  try{
+    var r=await sb.rpc('listar_usuarios');
+    if(r&&r.data&&r.data.length){document.getElementById('listaUsuarios').innerHTML=r.data.map(function(u){return '<option value="'+esc(u.email)+'">'+esc(u.nome||'')+'</option>';}).join('');}
+  }catch(e){}
+  document.getElementById('ovSenhas').classList.add('show');
+}
+function closeSenhas(){document.getElementById('ovSenhas').classList.remove('show');}
+async function salvarSenha(){
+  var email=(document.getElementById('senhaEmail').value||'').trim();
+  var nova=document.getElementById('senhaNova').value||'';
+  var conf=document.getElementById('senhaConf').value||'';
+  var m=document.getElementById('senhaMsg');m.style.color='#b02a2a';
+  if(!email){m.textContent='Informe o e-mail do usuario.';return;}
+  if(nova.length<6){m.textContent='A nova senha precisa ter ao menos 6 caracteres.';return;}
+  if(nova!==conf){m.textContent='As duas senhas nao sao iguais.';return;}
+  var r=await sb.rpc('admin_definir_senha',{target_email:email,nova_senha:nova});
+  if(r.error){m.textContent='Nao foi possivel alterar: '+r.error.message;return;}
+  m.style.color='#1f7a4d';
+  m.textContent=r.data||('Senha alterada para '+email);
+  document.getElementById('senhaNova').value='';
+  document.getElementById('senhaConf').value='';
+  toast('Senha alterada','ok');
+}
 async function boot(){
   const msg=document.getElementById('loginMsg');
   if(!sb){msg.textContent='Sistema ainda não configurado: falta preencher a URL e a chave do Supabase no arquivo HTML.';msg.style.display='block';return;}
@@ -1099,7 +1146,7 @@ function abrirRecibo(o){
   w.document.open();w.document.write(doc);w.document.close();
 }
 
-if(!isGestao){var _bf=document.getElementById('btnFin');if(_bf)_bf.style.display='none';}
+if(!isGestao){var _bf=document.getElementById('btnFin');if(_bf)_bf.style.display='none';}if(!isGestao){var _bs=document.getElementById('btnSenhas');if(_bs)_bs.style.display='none';}
 initTheme();
 boot();
 </script>
