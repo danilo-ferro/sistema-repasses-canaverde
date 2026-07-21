@@ -276,7 +276,7 @@ tbody tr.pago:hover{background:var(--pago-hover)}
     <button class="hbtn add" onclick="openModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Novo</button>
     <button class="hbtn themebtn" id="themeBtn" onclick="toggleTheme()" title="Alternar modo claro/escuro"></button>
     <button class="hbtn" onclick="openLog()" title="Histórico de alterações"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Histórico</button>
-    <button class="hbtn" id="btnSenhas" onclick="openSenhas()" title="Alterar senhas dos usuarios (somente gestao)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="m16 5 3 3"/><path d="m19 2 3 3"/></svg>Senhas</button>
+    <button class="hbtn" id="btnSenhas" onclick="openSenhas()" title="Gerenciar usuarios (somente gestao)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Usuários</button>
     <button class="hbtn" onclick="doLogout()" title="Sair"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sair</button>
   </div>
 </header>
@@ -337,17 +337,10 @@ tbody tr.pago:hover{background:var(--pago-hover)}
   <div class="modal-f"><button class="btn" onclick="closeRec()">Cancelar</button><button class="btn primary" onclick="gerarRecibo()">Gerar recibo de quitação</button></div>
 </div></div>
 
-<div class="ov" id="ovSenhas"><div class="modal">
-  <div class="modal-h"><h3>Alterar senha de usuario</h3><button class="xbtn" onclick="closeSenhas()">&times;</button></div>
-  <div class="modal-b" style="display:block" id="senhasBody">
-    <div class="fld full"><label>E-mail do usuario</label><input id="senhaEmail" type="email" list="listaUsuarios" placeholder="usuario@exemplo.com" autocomplete="off"><datalist id="listaUsuarios"></datalist></div>
-    <div class="fld"><label>Nova senha</label><input id="senhaNova" type="password" placeholder="minimo 6 caracteres" autocomplete="new-password"></div>
-    <div class="fld"><label>Repita a nova senha</label><input id="senhaConf" type="password" placeholder="digite de novo" autocomplete="new-password"></div>
-    <div class="fld full" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="senhaShow" onchange="var t=this.checked?'text':'password';document.getElementById('senhaNova').type=t;document.getElementById('senhaConf').type=t;"><label style="text-transform:none;font-size:13px;color:#444">Mostrar as senhas digitadas</label></div>
-    <div id="senhaMsg" style="margin-top:6px;font-size:13px;font-weight:600"></div>
-    <div class="hint" style="font-size:11px;color:#889;margin-top:6px">A pessoa passa a entrar com a nova senha imediatamente. Somente o perfil gestao consegue fazer esta alteracao.</div>
-  </div>
-  <div class="modal-f"><button class="btn" onclick="closeSenhas()">Cancelar</button><button class="btn primary" onclick="salvarSenha()">Alterar senha</button></div>
+<div class="ov" id="ovSenhas"><div class="modal big">
+  <div class="modal-h"><h3>Usu&aacute;rios</h3><button class="xbtn" onclick="closeSenhas()">&times;</button></div>
+  <div class="modal-b" style="display:block" id="senhasBody"></div>
+  <div class="modal-f"><button class="btn" onclick="closeSenhas()">Fechar</button></div>
 </div></div>
 
 <div class="toast" id="toast"></div>
@@ -747,38 +740,96 @@ function buildFilterOptions(){
   document.getElementById('ano').value=selA; document.getElementById('mes').value=selM;
 }
 /* ---------- login / init ---------- */
+/* ===== Painel de Usuarios (somente gestao) ===== */
+var USUARIOS=[];
+var FORM_MODO='';   /* 'novo' | 'editar' */
+var FORM_EMAIL='';
+
 async function openSenhas(){
-  if(!isGestao){toast('Apenas a gestao pode alterar senhas','err');return;}
+  if(!isGestao){toast('Apenas a gestao pode gerenciar usuarios','err');return;}
   if(!sb){toast('Sistema nao configurado','err');return;}
-  var m=document.getElementById('senhaMsg');m.textContent='';m.style.color='';
-  document.getElementById('senhaEmail').value='';
-  document.getElementById('senhaNova').value='';
-  document.getElementById('senhaConf').value='';
-  document.getElementById('senhaShow').checked=false;
-  document.getElementById('senhaNova').type='password';
-  document.getElementById('senhaConf').type='password';
-  try{
-    var r=await sb.rpc('listar_usuarios');
-    if(r&&r.data&&r.data.length){document.getElementById('listaUsuarios').innerHTML=r.data.map(function(u){return '<option value="'+esc(u.email)+'">'+esc(u.nome||'')+'</option>';}).join('');}
-  }catch(e){}
   document.getElementById('ovSenhas').classList.add('show');
+  await renderUsuarios();
 }
 function closeSenhas(){document.getElementById('ovSenhas').classList.remove('show');}
-async function salvarSenha(){
-  var email=(document.getElementById('senhaEmail').value||'').trim();
-  var nova=document.getElementById('senhaNova').value||'';
-  var conf=document.getElementById('senhaConf').value||'';
-  var m=document.getElementById('senhaMsg');m.style.color='#b02a2a';
-  if(!email){m.textContent='Informe o e-mail do usuario.';return;}
-  if(nova.length<6){m.textContent='A nova senha precisa ter ao menos 6 caracteres.';return;}
-  if(nova!==conf){m.textContent='As duas senhas nao sao iguais.';return;}
-  var r=await sb.rpc('admin_definir_senha',{target_email:email,nova_senha:nova});
-  if(r.error){m.textContent='Nao foi possivel alterar: '+r.error.message;return;}
-  m.style.color='#1f7a4d';
-  m.textContent=r.data||('Senha alterada para '+email);
-  document.getElementById('senhaNova').value='';
-  document.getElementById('senhaConf').value='';
-  toast('Senha alterada','ok');
+
+async function renderUsuarios(){
+  var box=document.getElementById('senhasBody');
+  box.innerHTML='<div style="color:#889;font-size:13px;padding:8px 0">Carregando\u2026</div>';
+  USUARIOS=[];
+  try{ var r=await sb.rpc('listar_usuarios'); if(r&&r.data) USUARIOS=r.data; }catch(e){}
+  var linhas=USUARIOS.map(function(u,i){
+    var cor=(u.perfil==='gestao')?'#1a3a5c':'#8a95a5';
+    var badge='<span style="background:'+cor+';color:#fff;border-radius:6px;padding:1px 7px;font-size:10.5px;font-weight:700;text-transform:uppercase">'+esc(u.perfil)+'</span>';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #e6ebf2">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-weight:600">'+esc(u.nome||'(sem nome)')+' '+badge+'</div>'
+      +'<div style="font-family:\'SF Mono\',\'Consolas\',monospace;font-size:12px;color:#778">'+esc(u.email)+'</div>'
+      +'</div>'
+      +'<button class="chip" onclick="formEditar('+i+')">Editar</button>'
+      +'<button class="chip" style="color:#b02a2a;border-color:#e6b3b3" onclick="excluirUsuario('+i+')">Excluir</button>'
+      +'</div>';
+  }).join('');
+  box.innerHTML=
+     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    +'<div style="font-size:13px;color:#778">'+USUARIOS.length+' usuario(s)</div>'
+    +'<button class="btn primary" onclick="formNovo()">+ Novo usuario</button>'
+    +'</div>'
+    +(linhas||'<div style="color:#889;font-size:13px;padding:10px 0">Nenhum usuario cadastrado.</div>');
+}
+
+function formNovo(){ mostrarForm('novo', {email:'',nome:'',perfil:'atendimento'}); }
+function formEditar(i){ var u=USUARIOS[i]; if(!u)return; mostrarForm('editar', u); }
+
+function mostrarForm(modo, u){
+  FORM_MODO=modo; FORM_EMAIL=u.email||'';
+  var titulo=(modo==='novo')?'Novo usuario':'Editar usuario';
+  var emailField=(modo==='editar')
+    ? '<input id="usuEmail" type="email" value="'+esc(u.email)+'" readonly style="background:#eef2f7;color:#556">'
+    : '<input id="usuEmail" type="email" placeholder="usuario@exemplo.com" autocomplete="off">';
+  var senhaPh=(modo==='novo')?'minimo 6 caracteres':'deixe em branco para manter a atual';
+  var box=document.getElementById('senhasBody');
+  box.innerHTML=
+     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><button class="chip" onclick="renderUsuarios()">\u2190 Voltar</button><b>'+titulo+'</b></div>'
+    +'<div class="fld full"><label>E-mail</label>'+emailField+'</div>'
+    +'<div class="fld full"><label>Nome do usuario</label><input id="usuNome" value="'+esc(u.nome||'')+'" placeholder="Ex.: Danilo Ferro"></div>'
+    +'<div class="fld"><label>Perfil</label><select id="usuPerfil">'
+      +'<option value="atendimento"'+(u.perfil==='atendimento'?' selected':'')+'>Atendimento (nao ve valores)</option>'
+      +'<option value="gestao"'+(u.perfil==='gestao'?' selected':'')+'>Gestao (acesso total)</option>'
+    +'</select></div>'
+    +'<div class="fld"><label>'+(modo==='novo'?'Senha':'Nova senha (opcional)')+'</label><input id="usuSenha" type="password" placeholder="'+senhaPh+'" autocomplete="new-password"></div>'
+    +'<div class="fld full" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="usuShow" onchange="var e=document.getElementById(\'usuSenha\');e.type=this.checked?\'text\':\'password\';"><label style="text-transform:none;font-size:13px;color:#444">Mostrar a senha</label></div>'
+    +'<div id="usuMsg" style="margin-top:6px;font-size:13px;font-weight:600"></div>'
+    +'<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" onclick="renderUsuarios()">Cancelar</button><button class="btn primary" onclick="salvarUsuario()">Salvar</button></div>';
+}
+
+async function salvarUsuario(){
+  var email=(document.getElementById('usuEmail').value||'').trim();
+  var nome=(document.getElementById('usuNome').value||'').trim();
+  var perfil=document.getElementById('usuPerfil').value;
+  var senha=document.getElementById('usuSenha').value||'';
+  var m=document.getElementById('usuMsg'); m.style.color='#b02a2a';
+  if(!email){m.textContent='Informe o e-mail.';return;}
+  var r;
+  if(FORM_MODO==='novo'){
+    if(senha.length<6){m.textContent='A senha precisa ter ao menos 6 caracteres.';return;}
+    r=await sb.rpc('admin_criar_usuario',{p_email:email,p_nome:nome,p_senha:senha,p_perfil:perfil});
+  }else{
+    if(senha && senha.length<6){m.textContent='A nova senha precisa ter ao menos 6 caracteres.';return;}
+    r=await sb.rpc('admin_atualizar_usuario',{p_email:FORM_EMAIL,p_nome:nome,p_perfil:perfil,p_nova_senha:(senha||null)});
+  }
+  if(r&&r.error){m.textContent='Nao foi possivel salvar: '+r.error.message;return;}
+  toast((r&&r.data)||'Salvo','ok');
+  await renderUsuarios();
+}
+
+async function excluirUsuario(i){
+  var u=USUARIOS[i]; if(!u)return;
+  if(!confirm('Excluir o usuario "'+(u.nome||u.email)+'" ('+u.email+')?\nEssa acao nao pode ser desfeita.'))return;
+  var r=await sb.rpc('admin_excluir_usuario',{p_email:u.email});
+  if(r&&r.error){toast('Nao foi possivel excluir: '+r.error.message,'err');return;}
+  toast((r&&r.data)||'Usuario excluido','ok');
+  await renderUsuarios();
 }
 async function boot(){
   const msg=document.getElementById('loginMsg');
