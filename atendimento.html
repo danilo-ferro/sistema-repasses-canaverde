@@ -530,10 +530,10 @@ function rowHTML(r){
     cells+='<td data-l="OBS">'+obsShort+'</td>';
   }
   cells+='<td data-l=""><div class="acts">'
-    +'<button class="ico" onclick="toggleExp('+jid(r)+')" title="Detalhes">'+(isGestao?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>')+'</button>'
+    +'<button class="ico" onclick="toggleExp('+jid(r)+')" title="'+(isGestao?'Financeiro e baixa de pagamento':'Detalhes')+'">'+(isGestao?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>')+'</button>'
     +'<button class="ico" onclick="openRec('+jid(r)+')" title="Recibo de quitação"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>'
     +'<button class="ico" onclick="openModal('+jid(r)+')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></button>'
-    +'<button class="ico del" onclick="delRec('+jid(r)+')" title="Excluir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'
+    +(isGestao?'<button class="ico del" onclick="delRec('+jid(r)+')" title="Excluir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>':'')
     +'</div></td>';
   const ncol=cols_count();
   const exp='<tr class="exprow" id="exp_'+rid(r)+'" style="display:none"><td class="exp" colspan="'+ncol+'">'+expHTML(r)+'</td></tr>';
@@ -1006,6 +1006,20 @@ function finRows(recs){
   }).sort((a,b)=>String(b.data_pagamento||'').localeCompare(String(a.data_pagamento||'')));
 }
 function finValor(r){const vp=parseBR(r.valor_pago);return vp>0?vp:Number(r.valor_num||0);}
+let finSort={key:'data',dir:-1};
+function setFinSort(k){if(finSort.key===k)finSort.dir*=-1;else finSort={key:k,dir:(k==='data'?-1:1)};render();}
+function sortFinRows(rows){
+  const k=finSort.key,d=finSort.dir;
+  return rows.slice().sort((a,b)=>{
+    let x,y;
+    if(k==='data'){x=String(a.data_pagamento||'');y=String(b.data_pagamento||'');}
+    else if(k==='comp'){x=parseComp(a.competencia).getTime();y=parseComp(b.competencia).getTime();}
+    else if(k==='vlanc'){x=Number(a.valor_num||0);y=Number(b.valor_num||0);}
+    else if(k==='vpago'){x=finValor(a);y=finValor(b);}
+    else{x=norm(String(a[k]||''));y=norm(String(b[k]||''));}
+    if(x<y)return -1*d;if(x>y)return 1*d;return 0;
+  });
+}
 function renderFin(recs,all){
   if(!isGestao){document.getElementById('wrap').innerHTML='<div class="empty"><div>O controle financeiro está disponível apenas no acesso da gestão.</div></div>';document.getElementById('count').innerHTML='';return;}
   const rows=finRows(recs);
@@ -1031,8 +1045,11 @@ function renderFin(recs,all){
     h+='<div class="empty"><div>Nenhum pagamento encontrado nesse período.</div></div>';
     document.getElementById('wrap').innerHTML=h;return;
   }
-  h+='<table><thead><tr><th class="nosort">Data do pagamento</th><th class="nosort">Cliente</th><th class="nosort">CPF</th><th class="nosort">Processo</th><th class="nosort">Grupo</th><th class="nosort">Competência</th><th class="nosort">Valor lançado</th><th class="nosort">Valor pago</th></tr></thead><tbody>';
-  rows.forEach(r=>{
+  const fcols=[['Data do pagamento','data'],['Cliente','nome'],['CPF','cpf'],['Processo','processo'],['Grupo','grupo'],['Competência','comp'],['Valor lançado','vlanc'],['Valor pago','vpago']];
+  h+='<table><thead><tr>';
+  fcols.forEach(c=>{const active=finSort.key===c[1];const ar=active?(finSort.dir>0?'▲':'▼'):'▲▼';h+='<th onclick="setFinSort(\''+c[1]+'\')">'+c[0]+' <span class="arr"'+(active?' style="opacity:.85"':'')+'>'+ar+'</span></th>';});
+  h+='</tr></thead><tbody>';
+  sortFinRows(rows).forEach(r=>{
     h+='<tr><td data-l="Data do pagamento"><b>'+esc(dataBR(r.data_pagamento))+'</b></td>'
       +'<td data-l="Cliente"><span class="cli">'+esc(r.nome)+'</span></td>'
       +'<td data-l="CPF"><span class="cpf mono">'+esc(r.cpf||'—')+'</span></td>'
